@@ -1,10 +1,12 @@
-import React, { useState } from "react"
-import { Bot, Send, Settings } from "lucide-react"
+"use client"
+
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
+import { Settings, Send, Bot, Loader2 } from "lucide-react"
 
-export default function App() {
+export default function YouTubeAgentChat() {
   const [youtubeURL, setYoutubeURL] = useState("")
   const [persona, setPersona] = useState(null)
   const [history, setHistory] = useState([])
@@ -17,7 +19,8 @@ export default function App() {
     return match ? match[1] : null
   }
 
-  const handleGenerateAgent = async () => {
+  const handleGenerateAgent = async (e) => {
+    e.preventDefault()
     const videoId = extractVideoId(youtubeURL)
     if (!videoId) return alert("Invalid YouTube URL")
 
@@ -26,7 +29,7 @@ export default function App() {
       const res = await fetch("/generate-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoId })
+        body: JSON.stringify({ videoId }),
       })
       const data = await res.json()
       console.log("Generated agent:", data)
@@ -40,7 +43,8 @@ export default function App() {
     }
   }
 
-  const handleChat = async () => {
+  const handleChat = async (e) => {
+    e.preventDefault()
     if (!userInput.trim()) return
 
     const newHistory = [...history, [userInput, ""]]
@@ -52,7 +56,7 @@ export default function App() {
       const res = await fetch("/chat-with-agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ persona, history: newHistory })
+        body: JSON.stringify({ persona, history: newHistory }),
       })
       const data = await res.json()
       newHistory[newHistory.length - 1][1] = data.reply
@@ -84,15 +88,13 @@ export default function App() {
 
       {/* Main Content */}
       <div className="flex w-full pt-16">
-        {/* Sidebar */}
+        {/* Left Sidebar */}
         <div className="w-80 bg-muted/30 border-r border-border p-6">
           <Card className="p-6">
             <h2 className="text-lg font-semibold mb-4">Generate AI Agent</h2>
-            <div className="space-y-4">
+            <form onSubmit={handleGenerateAgent} className="space-y-4">
               <div>
-                <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                  YouTube URL
-                </label>
+                <label className="text-sm font-medium text-muted-foreground mb-2 block">YouTube URL</label>
                 <Input
                   placeholder="https://youtube.com/watch?v=..."
                   value={youtubeURL}
@@ -101,14 +103,41 @@ export default function App() {
                 />
               </div>
               <Button
-                onClick={handleGenerateAgent}
+                type="submit"
                 className="w-full bg-red-600 hover:bg-red-700 text-white"
                 disabled={!youtubeURL.trim() || loading}
               >
-                <Bot className="w-4 h-4 mr-2" />
-                {loading ? "Generating..." : "Generate Agent"}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Bot className="w-4 h-4 mr-2" />
+                    Generate Agent
+                  </>
+                )}
               </Button>
-            </div>
+            </form>
+
+            {persona && (
+              <div className="mt-6 p-4 bg-card rounded-lg border">
+                <h3 className="font-semibold text-sm text-muted-foreground mb-2">Generated Agent</h3>
+                <div className="space-y-2">
+                  <p className="font-medium">{persona.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Age:</strong> {persona.age}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Tone:</strong> {persona.tone}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    <strong>Interests:</strong> {persona.interests.join(", ")}
+                  </p>
+                </div>
+              </div>
+            )}
           </Card>
         </div>
 
@@ -123,64 +152,83 @@ export default function App() {
               <div>
                 <h3 className="font-semibold">Chat with Agent</h3>
                 <p className="text-sm text-muted-foreground">
-                  {persona ? `You're talking to ${persona.name}` : "Generate an agent to start chatting"}
+                  {persona ? `Chatting with ${persona.name}` : "Generate an agent to start chatting"}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Message History */}
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {persona ? (
-              history.length === 0 ? (
-                <div className="text-muted-foreground text-center mt-20">
-                  <p>No messages yet. Start chatting!</p>
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {history.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center max-w-md">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bot className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">
+                    {persona
+                      ? "Start a conversation with your YouTube agent!"
+                      : "No agent generated yet. Paste a YouTube URL and click 'Generate Agent' to start chatting!"}
+                  </p>
                 </div>
-              ) : (
-                history.map(([user, bot], i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="bg-gray-100 rounded-lg px-4 py-2 max-w-lg self-start">
-                      <strong>You:</strong> {user}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {history.map(([user, bot], i) => (
+                  <div key={i} className="space-y-3">
+                    {/* User message */}
+                    <div className="flex justify-end">
+                      <div className="max-w-[70%] bg-red-600 text-white rounded-lg px-4 py-2">
+                        <p className="text-sm font-medium mb-1">You</p>
+                        <p>{user}</p>
+                      </div>
                     </div>
+                    {/* Agent message */}
                     {bot && (
-                      <div className="bg-red-100 rounded-lg px-4 py-2 max-w-lg self-end text-right">
-                        <strong>{persona.name}:</strong> {bot}
+                      <div className="flex justify-start">
+                        <div className="max-w-[70%] bg-card border rounded-lg px-4 py-2">
+                          <p className="text-sm font-medium mb-1 text-muted-foreground">{persona?.name || "Agent"}</p>
+                          <p>{bot}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Loading indicator for generating response */}
+                    {!bot && generating && i === history.length - 1 && (
+                      <div className="flex justify-start">
+                        <div className="max-w-[70%] bg-card border rounded-lg px-4 py-2">
+                          <p className="text-sm font-medium mb-1 text-muted-foreground">{persona?.name || "Agent"}</p>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span className="text-muted-foreground">Thinking...</span>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
-                ))
-              )
-            ) : (
-              <div className="text-center max-w-md mx-auto mt-20">
-                <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Bot className="w-8 h-8 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground">
-                  No agent generated yet. Paste a YouTube URL and click "Generate Agent" to start chatting!
-                </p>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Input */}
+          {/* Message Input */}
           <div className="p-6 border-t border-border">
-            <div className="flex gap-2">
+            <form onSubmit={handleChat} className="flex gap-2">
               <Input
-                placeholder={persona ? "Say something..." : "Generate an agent to chat"}
+                placeholder={persona ? "Type your message..." : "Generate an agent to chat"}
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleChat()}
                 disabled={!persona || generating}
                 className="flex-1"
               />
               <Button
-                onClick={handleChat}
+                type="submit"
                 disabled={!persona || !userInput.trim() || generating}
                 className="bg-red-600 hover:bg-red-700 text-white"
               >
-                {generating ? "..." : <Send className="w-4 h-4" />}
+                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </Button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
